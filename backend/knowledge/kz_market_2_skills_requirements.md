@@ -7,6 +7,72 @@ Sources: User-provided text ("Kazakhstan Labour Market Knowledge Base (for Caree
 
 Employers in Kazakhstan expect a combination of technical, digital, and interpersonal skills.
 
+### Profession: Frontend Developer (React)
+#### Must-have
+- JavaScript
+- HTML
+- CSS
+- React
+- Git
+#### Nice-to-have
+- TypeScript
+- Next.js
+- UI/UX basics
+
+### Profession: Backend Developer (Node / Java / .NET)
+#### Must-have
+- Backend language (Node.js / Java / C#)
+- REST API
+- Databases (SQL)
+#### Nice-to-have
+- Microservices
+- Docker
+- Cloud (AWS, Azure)
+
+### Profession: QA Automation Engineer
+#### Must-have
+- Testing fundamentals
+- Selenium or Playwright
+- JavaScript or Python
+#### Nice-to-have
+- CI/CD
+- API testing
+
+### Profession: DevOps Engineer
+#### Must-have
+- Linux
+- Docker
+- CI/CD
+#### Nice-to-have
+- Kubernetes
+- Cloud (AWS, GCP)
+
+### Profession: Product Manager
+#### Must-have
+- Product thinking
+- Communication
+- Analytics
+#### Nice-to-have
+- SQL
+- UX understanding
+
+### Profession: UX Designer
+#### Must-have
+- Figma
+- UX research
+- Prototyping
+#### Nice-to-have
+- UI design
+- HTML/CSS
+
+### Profession: SMM Manager
+#### Must-have
+- Social media strategy
+- Content creation
+#### Nice-to-have
+- Ads (Meta, TikTok)
+- Analytics
+
 ### Profession: Software Developer
 #### Required skills
 - JavaScript

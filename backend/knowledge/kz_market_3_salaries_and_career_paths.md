@@ -50,6 +50,37 @@ Note: Certain industries such as oil and gas may offer higher salaries.
 - Mid level: 350k – 600k KZT
 - Senior level: 700k – 1.2M KZT
 
+### Profession: Backend Developer (Node / Java / .NET)
+- Junior: 200k – 300k KZT
+- Middle: 500k – 650k KZT
+- Senior: 1M – 2M+ KZT
+- Notes: High competition (especially at junior level)
+- Market reality: high demand in Almaty/Astana; junior market can be oversaturated
+
+### Profession: Frontend Developer (React)
+- Junior: 250k – 350k KZT
+- Middle: 400k – 700k KZT
+- Senior: 1M – 2M+ KZT
+- Market reality: high competition for juniors; portfolio is critical
+
+### Profession: DevOps Engineer
+- Junior: 300k – 500k KZT
+- Middle: 700k – 1.2M KZT
+- Senior: 1.5M+ KZT
+- Market reality: lower competition than dev roles; high demand
+
+### Profession: Product Manager
+- Junior: 400k – 600k KZT
+- Middle: 700k – 1.2M KZT
+- Senior: 1.5M+ KZT
+- Market reality: often requires prior experience (not purely entry-level)
+
+### Profession: SMM Manager
+- Junior: 150k – 300k KZT
+- Middle: 300k – 600k KZT
+- Senior: 700k+ KZT
+- Market reality: high competition; portfolio can matter more than a diploma
+
 ## Career Paths
 
 ### Software Development Career Path

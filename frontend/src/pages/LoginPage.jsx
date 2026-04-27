@@ -1,26 +1,45 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000';
+
+async function fetchJson(url, options) {
+  const res = await fetch(url, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    const msg = data && data.error ? data.error : `Request failed (${res.status})`;
+    throw new Error(msg);
+  }
+  return data;
+}
+
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email || !password) {
       setError('Please fill in all fields');
       return;
     }
-    // Check registered users
-    const users = JSON.parse(localStorage.getItem('users')) || [];
-    const user = users.find(u => u.email === email && u.password === password);
-    if (user) {
-      localStorage.setItem('currentUser', JSON.stringify(user));
+
+    try {
+      setError('');
+      const data = await fetchJson(`${API_BASE}/api/auth/login`, {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+      localStorage.setItem('authToken', data.token);
+      localStorage.setItem('currentUser', JSON.stringify(data.user));
       navigate('/home');
-    } else {
-      setError('Invalid credentials');
+    } catch (err) {
+      setError(String(err && err.message ? err.message : err));
     }
   };
 

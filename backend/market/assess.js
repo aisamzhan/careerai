@@ -149,9 +149,12 @@ function assessForProfession(role, profile, goals) {
     else missing.push(g.label);
   }
 
-  const skillScore = role.requiredSkillGroups.length
-    ? (matched.length / role.requiredSkillGroups.length) * 70
-    : 0;
+  const mustHaveCount = Array.isArray(role.requiredSkillGroups) ? role.requiredSkillGroups.length : 0;
+  const requirementsKnown = mustHaveCount > 0;
+
+  // If KB doesn't have must-have requirements for this role yet, do not punish the user with a near-zero score.
+  // We compute a conservative score from experience/languages/portfolio only and keep confidence lower.
+  const skillScore = requirementsKnown ? (matched.length / mustHaveCount) * 70 : 0;
 
   const experienceScore = scoreExperienceMonths(profile.experienceMonths);
 
@@ -167,16 +170,36 @@ function assessForProfession(role, profile, goals) {
   const projectCount = clamp(Number(profile.projectCount || 0) || 0, 0, 20);
   const portfolioScore = projectCount >= 3 ? 10 : projectCount === 2 ? 7 : projectCount === 1 ? 4 : 0;
 
-  const fitScore = clamp(
-    Math.round(skillScore + experienceScore + englishBonus + kazakhBonus + portfolioScore),
-    0,
-    100,
-  );
+  const rawScore = requirementsKnown
+    ? skillScore + experienceScore + englishBonus + kazakhBonus + portfolioScore
+    : 20 + experienceScore + englishBonus + kazakhBonus + portfolioScore; // 20 baseline when skill requirements are unknown
+
+  const fitScore = clamp(Math.round(rawScore), 0, 100);
 
   const fitLabel = fitScore >= 80 ? 'Strong' : fitScore >= 60 ? 'Good' : fitScore >= 40 ? 'Early' : 'Needs work';
 
   const actionPlan = defaultActionPlan(role.name, missing);
   const gapAdvice = buildGapAdvice(role.id, missing);
+
+  // Confidence is about data completeness, not about the candidate.
+  // Higher confidence = we have more complete market data for this profession in KB.
+  const confParts = [];
+  const hasSkills = Array.isArray(role.requiredSkillGroups) && role.requiredSkillGroups.length > 0;
+  const sr = role.salaryRangesKZT || null;
+  const hasSalaryAny = Boolean(sr && (sr.entry || sr.mid || sr.senior));
+  const hasSalaryAll = Boolean(sr && sr.entry && sr.mid && sr.senior);
+  const hasMeta = Boolean(String(role.demandLevel || '').trim()) && Boolean(String(role.description || '').trim());
+
+  if (hasMeta) confParts.push('meta');
+  if (hasSkills) confParts.push('skills');
+  if (hasSalaryAny) confParts.push('salary');
+  if (hasSalaryAll) confParts.push('salary_levels');
+
+  // 0.35 base (we at least have a role), then +0.2 per data area
+  const confidence = clamp(Math.round((0.35 + confParts.length * 0.15) * 100) / 100, 0.2, 0.95);
+  const confidenceReason = !hasSkills && !hasSalaryAny
+    ? 'Limited KB data for this role (missing skills and salary).'
+    : `KB data coverage: ${confParts.join(', ') || 'basic'}.`;
 
   return {
     professionId: role.id,
@@ -188,11 +211,15 @@ function assessForProfession(role, profile, goals) {
     fitLabel,
     matchedSkills: matched,
     missingSkills: missing,
+    mustHaveCount,
+    requirementsKnown,
     salaryRangesKZT: role.salaryRangesKZT,
     marketNotes: role.marketNotes || [],
     careerPath: careerPathForRole(role.id),
     recommendations: gapAdvice,
     actionPlan,
+    confidence,
+    confidenceReason,
   };
 }
 

@@ -1,6 +1,21 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000';
+
+async function fetchJson(url, options) {
+  const res = await fetch(url, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    const msg = data && data.error ? data.error : `Request failed (${res.status})`;
+    throw new Error(msg);
+  }
+  return data;
+}
+
 const RegisterPage = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -10,7 +25,7 @@ const RegisterPage = () => {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name || !email || !university || !password || !confirmPassword) {
       setError('Please fill in all fields');
@@ -20,20 +35,19 @@ const RegisterPage = () => {
       setError('Passwords do not match');
       return;
     }
-    // Check if a user with this email already exists
-    const users = JSON.parse(localStorage.getItem('users')) || [];
-    const existingUser = users.find(user => user.email === email);
-    if (existingUser) {
-      setError('User with this email already exists');
-      return;
+
+    try {
+      setError('');
+      const data = await fetchJson(`${API_BASE}/api/auth/register`, {
+        method: 'POST',
+        body: JSON.stringify({ name, email, university, password }),
+      });
+      localStorage.setItem('authToken', data.token);
+      localStorage.setItem('currentUser', JSON.stringify(data.user));
+      navigate('/home');
+    } catch (err) {
+      setError(String(err && err.message ? err.message : err));
     }
-    // Save the new user
-    const newUser = { name, email, university, password };
-    users.push(newUser);
-    localStorage.setItem('users', JSON.stringify(users));
-    localStorage.setItem('currentUser', JSON.stringify(newUser));
-    // Registration simulation (local-only)
-    navigate('/home');
   };
 
   return (

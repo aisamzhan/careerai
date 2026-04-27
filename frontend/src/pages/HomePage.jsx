@@ -12,8 +12,12 @@ function safeJsonParse(value) {
 }
 
 async function fetchJson(url, options) {
+  const token = localStorage.getItem('authToken');
   const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     ...options,
   });
   const data = await res.json().catch(() => null);
@@ -72,9 +76,55 @@ const HomePage = () => {
   const [resumeInfo, setResumeInfo] = useState(null);
   const resumeInputRef = useRef(null);
 
+  const [billing, setBilling] = useState(null);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [billingError, setBillingError] = useState('');
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [paywallFor, setPaywallFor] = useState(''); // 'resume' | 'chat' | ''
+  const [transactionId, setTransactionId] = useState('');
+  const [payerAccount, setPayerAccount] = useState('');
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [billingRequestLoading, setBillingRequestLoading] = useState(false);
+  const [billingRequestMsg, setBillingRequestMsg] = useState('');
+
   useEffect(() => {
     if (!user) navigate('/login');
   }, [user, navigate]);
+
+  const hasPro = (() => {
+    const sub = billing && billing.subscription ? billing.subscription : null;
+    if (!sub || sub.status !== 'active') return false;
+    const end = sub.currentPeriodEnd ? new Date(sub.currentPeriodEnd).getTime() : 0;
+    return end > Date.now();
+  })();
+
+  const proUntilLabel = (() => {
+    if (!hasPro) return null;
+    const end = billing && billing.subscription && billing.subscription.currentPeriodEnd ? billing.subscription.currentPeriodEnd : null;
+    if (!end) return null;
+    try {
+      return new Date(end).toLocaleDateString();
+    } catch {
+      return null;
+    }
+  })();
+
+  const openPaywall = async (kind) => {
+    setPaywallFor(kind || '');
+    setShowPaywall(true);
+    setBillingRequestMsg('');
+    setBillingError('');
+
+    try {
+      setBillingLoading(true);
+      const data = await fetchJson(`${API_BASE}/api/billing/status`);
+      setBilling(data);
+    } catch (e) {
+      setBillingError(String(e && e.message ? e.message : e));
+    } finally {
+      setBillingLoading(false);
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -86,7 +136,12 @@ const HomePage = () => {
         setProfessions(data.professions || []);
       } catch (e) {
         if (!mounted) return;
-        setError(String(e && e.message ? e.message : e));
+        const msg = String(e && e.message ? e.message : e);
+        setError(
+          msg.includes('(404)') || msg.includes('404')
+            ? 'API returned 404. This usually means VITE_API_BASE points to the frontend (Vite) instead of the backend. Make sure backend runs on http://localhost:3000 and frontend runs on http://localhost:5173, and VITE_API_BASE=http://localhost:3000.'
+            : msg,
+        );
       } finally {
         if (mounted) setLoadingProfessions(false);
       }
@@ -229,7 +284,14 @@ const HomePage = () => {
       });
       setAiAnswer(data.answer || '');
     } catch (e) {
-      setAiError(String(e && e.message ? e.message : e));
+      const msg = String(e && e.message ? e.message : e);
+      if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+        setAiError(
+          'Failed to reach the API. Check that VITE_API_BASE points to your deployed backend (https://...), and that the backend allows CORS from this domain.',
+        );
+      } else {
+        setAiError(msg);
+      }
     } finally {
       setAiLoading(false);
     }
@@ -299,6 +361,10 @@ const HomePage = () => {
   };
 
   const handleParseResume = async () => {
+    if (!hasPro) {
+      await openPaywall('resume');
+      return;
+    }
     if (!resumeFile) return;
     setResumeError('');
     setResumeInfo(null);
@@ -316,7 +382,12 @@ const HomePage = () => {
         }),
       );
 
-      const res = await fetch(`${API_BASE}/api/resume/parse`, { method: 'POST', body: formData });
+      const token = localStorage.getItem('authToken');
+      const res = await fetch(`${API_BASE}/api/resume/parse`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        body: formData,
+      });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         const msg = data && data.error ? data.error : `Request failed (${res.status})`;
@@ -342,9 +413,70 @@ const HomePage = () => {
         experienceText: p.experienceText || prev.experienceText || '',
       }));
     } catch (e) {
-      setResumeError(String(e && e.message ? e.message : e));
+      const msg = String(e && e.message ? e.message : e);
+      if (/failed to fetch|networkerror|load failed/i.test(msg)) {
+        setResumeError(
+          'Failed to reach the API. Check that VITE_API_BASE points to your deployed backend (https://...), and that the backend allows CORS from this domain.',
+        );
+      } else {
+        setResumeError(msg);
+      }
     } finally {
       setResumeLoading(false);
+    }
+  };
+
+  const handleRequestAccess = async () => {
+    const tid = String(transactionId || '').trim();
+    if (!tid) {
+      setBillingRequestMsg('Please enter a transaction ID.');
+      return;
+    }
+    const payer = String(payerAccount || '').trim();
+    if (!payer) {
+      setBillingRequestMsg('Please enter your Kaspi account/card (sender).');
+      return;
+    }
+    if (!receiptFile) {
+      setBillingRequestMsg('Please attach a screenshot of the receipt.');
+      return;
+    }
+
+    try {
+      setBillingRequestMsg('');
+      setBillingRequestLoading(true);
+
+      const token = localStorage.getItem('authToken');
+      const formData = new FormData();
+      formData.append('transactionId', tid);
+      formData.append('payerAccount', payer);
+      formData.append('receipt', receiptFile);
+
+      const res = await fetch(`${API_BASE}/api/billing/request`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        body: formData,
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        const msg = data && data.error ? data.error : `Request failed (${res.status})`;
+        throw new Error(msg);
+      }
+      setBillingRequestMsg('Submitted. We will approve it as soon as we verify the payment.');
+      setTransactionId('');
+      setPayerAccount('');
+      setReceiptFile(null);
+      // Refresh status after submission (optional)
+      try {
+        const status = await fetchJson(`${API_BASE}/api/billing/status`);
+        setBilling(status);
+      } catch {
+        // ignore
+      }
+    } catch (e) {
+      setBillingRequestMsg(String(e && e.message ? e.message : e));
+    } finally {
+      setBillingRequestLoading(false);
     }
   };
 
@@ -431,6 +563,80 @@ const HomePage = () => {
                   </button>
                 </div>
               </div>
+
+              {showPaywall && paywallFor === 'resume' && !hasPro && (
+                <div className="notice" style={{ marginTop: '12px' }}>
+                  <div className="notice__row">
+                    <span className="notice__label">Subscription</span>
+                    <span className="notice__value">
+                      {billingLoading ? 'Checking...' : 'Required to use Resume import'}
+                    </span>
+                  </div>
+                  {billingError && <div className="notice__small">{billingError}</div>}
+                  <div className="notice__small">
+                    Pay 990 KZT for 30 days to Kaspi account: <strong>4400430346149914</strong>
+                  </div>
+                  <div className="notice__small">
+                    Then enter your sender account/card and attach a screenshot of the receipt.
+                  </div>
+                  <div className="row" style={{ marginTop: '10px' }}>
+                    <label className="field">
+                      <span className="field__label">Your Kaspi account/card (sender)</span>
+                      <input
+                        className="input"
+                        value={payerAccount}
+                        placeholder="e.g. 4400...."
+                        onChange={(e) => setPayerAccount(e.target.value)}
+                      />
+                    </label>
+                    <label className="field">
+                      <span className="field__label">Transaction ID</span>
+                      <input
+                        className="input"
+                        value={transactionId}
+                        placeholder="e.g. 1234567890"
+                        onChange={(e) => setTransactionId(e.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <div className="row" style={{ marginTop: '10px' }}>
+                    <label className="field">
+                      <span className="field__label">Receipt screenshot</span>
+                      <input
+                        className="input"
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const f = e && e.target && e.target.files ? e.target.files[0] : null;
+                          setReceiptFile(f || null);
+                        }}
+                      />
+                      <span className="field__hint">Any image format (PNG/JPG). Max 3MB.</span>
+                    </label>
+                    <div className="field" style={{ alignContent: 'end' }}>
+                      <span className="field__label">Action</span>
+                      <button
+                        className="button"
+                        type="button"
+                        onClick={handleRequestAccess}
+                        disabled={billingRequestLoading}
+                      >
+                        {billingRequestLoading ? 'Submitting...' : 'Submit for approval'}
+                      </button>
+                      {billingRequestMsg && <div className="muted muted--small">{billingRequestMsg}</div>}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {hasPro && proUntilLabel && (
+                <div className="notice" style={{ marginTop: '12px' }}>
+                  <div className="notice__row">
+                    <span className="notice__label">Subscription</span>
+                    <span className="notice__value">Active</span>
+                  </div>
+                  <div className="notice__small">Active until: {proUntilLabel}</div>
+                </div>
+              )}
 
               {resumeError && <div className="error error--left">{resumeError}</div>}
 
@@ -698,7 +904,11 @@ const HomePage = () => {
                     <div className="role-result__grid">
                       <div className="role-result__block">
                         <div className="role-result__label">Strengths</div>
-                        {r.matchedSkills.length ? (
+                        {!r.requirementsKnown ? (
+                          <div className="role-result__hint">
+                            No must-have skills defined in the knowledge base for this role yet.
+                          </div>
+                        ) : r.matchedSkills.length ? (
                           <div className="chips">
                             {r.matchedSkills.map((s) => (
                               <span key={s} className="chip chip--ok">
@@ -713,7 +923,11 @@ const HomePage = () => {
 
                       <div className="role-result__block">
                         <div className="role-result__label">Gaps</div>
-                        {r.missingSkills.length ? (
+                        {!r.requirementsKnown ? (
+                          <div className="role-result__hint">
+                            Add must-have skills for this role to the knowledge base to get accurate gaps.
+                          </div>
+                        ) : r.missingSkills.length ? (
                           <div className="chips">
                             {r.missingSkills.map((s) => (
                               <span key={s} className="chip chip--warn">
@@ -839,9 +1053,84 @@ const HomePage = () => {
                   />
                 </div>
                 {aiError && <div className="error">{aiError}</div>}
-                <button className="button" type="button" onClick={handleAskAI} disabled={aiLoading}>
+                <button
+                  className="button"
+                  type="button"
+                  onClick={async () => {
+                    if (!hasPro) {
+                      await openPaywall('chat');
+                      return;
+                    }
+                    handleAskAI();
+                  }}
+                  disabled={aiLoading}
+                >
                   {aiLoading ? 'Thinking...' : 'Ask'}
                 </button>
+                {showPaywall && paywallFor === 'chat' && !hasPro && (
+                  <div className="notice" style={{ marginTop: '12px' }}>
+                    <div className="notice__row">
+                      <span className="notice__label">Subscription</span>
+                      <span className="notice__value">
+                        {billingLoading ? 'Checking...' : 'Required to use AI Chat'}
+                      </span>
+                    </div>
+                    {billingError && <div className="notice__small">{billingError}</div>}
+                    <div className="notice__small">
+                      Pay 990 KZT for 30 days to Kaspi account: <strong>4400430346149914</strong>
+                    </div>
+                    <div className="notice__small">
+                      Then enter your sender account/card and attach a screenshot of the receipt.
+                    </div>
+                    <div className="row" style={{ marginTop: '10px' }}>
+                      <label className="field">
+                        <span className="field__label">Your Kaspi account/card (sender)</span>
+                        <input
+                          className="input"
+                          value={payerAccount}
+                          placeholder="e.g. 4400...."
+                          onChange={(e) => setPayerAccount(e.target.value)}
+                        />
+                      </label>
+                      <label className="field">
+                        <span className="field__label">Transaction ID</span>
+                        <input
+                          className="input"
+                          value={transactionId}
+                          placeholder="e.g. 1234567890"
+                          onChange={(e) => setTransactionId(e.target.value)}
+                        />
+                      </label>
+                    </div>
+                    <div className="row" style={{ marginTop: '10px' }}>
+                      <label className="field">
+                        <span className="field__label">Receipt screenshot</span>
+                        <input
+                          className="input"
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const f = e && e.target && e.target.files ? e.target.files[0] : null;
+                            setReceiptFile(f || null);
+                          }}
+                        />
+                        <span className="field__hint">Any image format (PNG/JPG). Max 3MB.</span>
+                      </label>
+                      <div className="field" style={{ alignContent: 'end' }}>
+                        <span className="field__label">Action</span>
+                        <button
+                          className="button"
+                          type="button"
+                          onClick={handleRequestAccess}
+                          disabled={billingRequestLoading}
+                        >
+                          {billingRequestLoading ? 'Submitting...' : 'Submit for approval'}
+                        </button>
+                        {billingRequestMsg && <div className="muted muted--small">{billingRequestMsg}</div>}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {aiAnswer && (
                   <>
                     <pre className="ai-answer">{aiAnswer}</pre>

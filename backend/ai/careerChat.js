@@ -32,6 +32,29 @@ function resolveIntent({ message, mode }) {
 }
 
 const PROFESSION_SYNONYMS = {
+  frontend_react: [
+    'frontend developer',
+    'front-end developer',
+    'react developer',
+    'frontend react',
+    'фронтенд',
+    'фронтэнд',
+    'реакт',
+  ],
+  backend_general: [
+    'backend developer',
+    'back-end developer',
+    'node developer',
+    'java backend',
+    '.net developer',
+    'dotnet developer',
+    'бэкенд',
+    'бекенд',
+  ],
+  devops_engineer: ['devops', 'devops engineer', 'ci/cd', 'docker', 'kubernetes', 'девопс'],
+  product_manager: ['product manager', 'pm', 'продакт', 'продакт менеджер'],
+  ux_designer: ['ux designer', 'ux', 'юикс', 'юикс дизайнер'],
+  smm_manager: ['smm', 'smm manager', 'social media manager', 'смм'],
   software_developer: ['software developer', 'developer', 'разработчик', 'программист', 'software dev'],
   data_analyst: ['data analyst', 'аналитик данных', 'data analysis', 'аналитик'],
   accountant: ['accountant', 'бухгалтер'],
