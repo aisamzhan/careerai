@@ -1,0 +1,8 @@
+# Root-level ignores
+.npm-cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
