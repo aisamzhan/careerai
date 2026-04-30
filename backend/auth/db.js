@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const crypto = require('crypto');
 
 let _pool = null;
 
@@ -30,9 +31,30 @@ async function initAuthDb() {
       email TEXT NOT NULL UNIQUE,
       university TEXT NOT NULL,
       password_hash TEXT NOT NULL,
+      email_verified BOOLEAN NOT NULL DEFAULT true,
+      email_verification_token_hash TEXT NOT NULL DEFAULT '',
+      email_verification_expires_at TIMESTAMPTZ,
+      password_reset_token_hash TEXT NOT NULL DEFAULT '',
+      password_reset_expires_at TIMESTAMPTZ,
+      password_reset_used_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+  // Backfill columns on existing installs (idempotent).
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT true`);
+  await pool.query(
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_token_hash TEXT NOT NULL DEFAULT ''`,
+  );
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_expires_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_token_hash TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_expires_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_used_at TIMESTAMPTZ`);
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS users_email_verification_token_hash_idx ON users(email_verification_token_hash)`,
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS users_password_reset_token_hash_idx ON users(password_reset_token_hash)`,
+  );
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS subscriptions (
@@ -89,7 +111,7 @@ async function initAuthDb() {
 async function findUserByEmail(email) {
   const pool = getPool();
   const res = await pool.query(
-    `SELECT id, name, email, university, password_hash, created_at
+    `SELECT id, name, email, university, password_hash, email_verified, created_at
      FROM users
      WHERE email = $1
      LIMIT 1`,
@@ -98,13 +120,13 @@ async function findUserByEmail(email) {
   return res.rows[0] || null;
 }
 
-async function createUser({ name, email, university, passwordHash }) {
+async function createUser({ name, email, university, passwordHash, emailVerified = true }) {
   const pool = getPool();
   const res = await pool.query(
-    `INSERT INTO users (name, email, university, password_hash)
-     VALUES ($1, $2, $3, $4)
-     RETURNING id, name, email, university, created_at`,
-    [name, email, university, passwordHash],
+    `INSERT INTO users (name, email, university, password_hash, email_verified)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING id, name, email, university, email_verified, created_at`,
+    [name, email, university, passwordHash, Boolean(emailVerified)],
   );
   return res.rows[0];
 }
@@ -113,13 +135,89 @@ async function listUsers({ limit = 200 } = {}) {
   const pool = getPool();
   const safeLimit = Math.max(1, Math.min(1000, Number(limit) || 200));
   const res = await pool.query(
-    `SELECT id, name, email, university, created_at
+    `SELECT id, name, email, university, email_verified, created_at
      FROM users
      ORDER BY created_at DESC
      LIMIT $1`,
     [safeLimit],
   );
   return res.rows || [];
+}
+
+function sha256Hex(value) {
+  return crypto.createHash('sha256').update(String(value || '')).digest('hex');
+}
+
+async function setEmailVerificationToken({ userId, token, ttlHours = 24 } = {}) {
+  const pool = getPool();
+  const tokenHash = sha256Hex(token);
+  const expiresAt = new Date(Date.now() + Math.max(1, Number(ttlHours) || 24) * 60 * 60 * 1000).toISOString();
+
+  const res = await pool.query(
+    `UPDATE users
+     SET email_verified = false,
+         email_verification_token_hash = $2,
+         email_verification_expires_at = $3
+     WHERE id = $1
+     RETURNING id, email, email_verified, email_verification_expires_at`,
+    [userId, tokenHash, expiresAt],
+  );
+  return res.rows[0] || null;
+}
+
+async function verifyEmailByToken({ token } = {}) {
+  const pool = getPool();
+  const tokenHash = sha256Hex(token);
+  const res = await pool.query(
+    `UPDATE users
+     SET email_verified = true,
+         email_verification_token_hash = '',
+         email_verification_expires_at = NULL
+     WHERE email_verification_token_hash = $1
+       AND email_verified = false
+       AND (email_verification_expires_at IS NULL OR email_verification_expires_at > now())
+     RETURNING id, name, email, university, email_verified, created_at`,
+    [tokenHash],
+  );
+  return res.rows[0] || null;
+}
+
+async function setPasswordResetTokenByEmail({ email, token, ttlMinutes = 30 } = {}) {
+  const pool = getPool();
+  const tokenHash = sha256Hex(token);
+  const expiresAt = new Date(
+    Date.now() + Math.max(5, Number(ttlMinutes) || 30) * 60 * 1000,
+  ).toISOString();
+
+  const res = await pool.query(
+    `UPDATE users
+     SET password_reset_token_hash = $2,
+         password_reset_expires_at = $3,
+         password_reset_used_at = NULL
+     WHERE email = $1
+     RETURNING id, email, password_reset_expires_at`,
+    [email, tokenHash, expiresAt],
+  );
+  return res.rows[0] || null;
+}
+
+async function consumePasswordResetToken({ token, newPasswordHash } = {}) {
+  const pool = getPool();
+  const tokenHash = sha256Hex(token);
+  const res = await pool.query(
+    `UPDATE users
+     SET password_hash = $2,
+         password_reset_token_hash = '',
+         password_reset_expires_at = NULL,
+         password_reset_used_at = now()
+     WHERE password_reset_token_hash = $1
+       AND password_reset_token_hash <> ''
+       AND (password_reset_expires_at IS NULL OR password_reset_expires_at > now())
+       AND password_reset_used_at IS NULL
+     RETURNING id, name, email, university, email_verified, created_at`,
+    [tokenHash, newPasswordHash],
+  );
+  return res.rows[0] || null;
 }
 
 async function getActiveSubscriptionByUserId(userId) {
@@ -254,6 +352,10 @@ module.exports = {
   findUserByEmail,
   createUser,
   listUsers,
+  setEmailVerificationToken,
+  verifyEmailByToken,
+  setPasswordResetTokenByEmail,
+  consumePasswordResetToken,
   getActiveSubscriptionByUserId,
   upsertSubscription,
   createPaymentRequest,

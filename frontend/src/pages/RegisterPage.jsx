@@ -23,6 +23,7 @@ const RegisterPage = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -38,13 +39,26 @@ const RegisterPage = () => {
 
     try {
       setError('');
+      setInfo('');
       const data = await fetchJson(`${API_BASE}/api/auth/register`, {
         method: 'POST',
         body: JSON.stringify({ name, email, university, password }),
       });
-      localStorage.setItem('authToken', data.token);
-      localStorage.setItem('currentUser', JSON.stringify(data.user));
-      navigate('/home');
+
+      if (data && data.needsVerification) {
+        setInfo('Account created. Please check your email and verify your address before signing in.');
+        return;
+      }
+
+      // Fallback (when email verification is not enabled on the server)
+      if (data && data.token && data.user) {
+        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('currentUser', JSON.stringify(data.user));
+        navigate('/home');
+        return;
+      }
+
+      setInfo('Account created. You can now sign in.');
     } catch (err) {
       setError(String(err && err.message ? err.message : err));
     }
@@ -113,6 +127,7 @@ const RegisterPage = () => {
           />
 
           {error && <div className="error">{error}</div>}
+          {info && <div className="notice">{info}</div>}
 
           <button type="submit" className="button">
             Register

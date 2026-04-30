@@ -5,6 +5,9 @@ import LandingPage from './pages/LandingPage';
 import HowItWorksPage from './pages/HowItWorksPage';
 import PricingPage from './pages/PricingPage';
 import FaqPage from './pages/FaqPage';
+import VerifyEmailPage from './pages/VerifyEmailPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import HomePage from './pages/HomePage';
 import ProfilePage from './pages/ProfilePage';
 import AdminPage from './pages/AdminPage';
@@ -19,6 +22,9 @@ function App() {
         <Route path="/how-it-works" element={<Layout><HowItWorksPage /></Layout>} />
         <Route path="/pricing" element={<Layout><PricingPage /></Layout>} />
         <Route path="/faq" element={<Layout><FaqPage /></Layout>} />
+        <Route path="/verify-email" element={<Layout><VerifyEmailPage /></Layout>} />
+        <Route path="/forgot-password" element={<Layout><ForgotPasswordPage /></Layout>} />
+        <Route path="/reset-password" element={<Layout><ResetPasswordPage /></Layout>} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/home" element={<Layout><HomePage /></Layout>} />
