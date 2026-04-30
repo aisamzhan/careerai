@@ -57,7 +57,7 @@ function Navbar() {
     <nav className="navbar" aria-label="Primary">
       <div className="navbar__inner">
         <div className="navbar__left">
-          <NavLink to={isAuthed ? '/home' : '/'} className="navbar__brand">
+          <NavLink to="/" className="navbar__brand">
             CareerAI
           </NavLink>
 
