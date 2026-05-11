@@ -23,6 +23,8 @@ const {
   getPaymentReceiptById,
   appendAdminAudit,
   listAdminAudit,
+  createUsageEvent,
+  listUsageWeeklyCounts,
 } = require('./auth/db');
 const { hashPassword, verifyPassword } = require('./auth/password');
 const { createAuthToken, verifyAuthToken, isAdminEmail } = require('./auth/token');
@@ -551,6 +553,13 @@ app.post('/api/ai/chat', async (req, res) => {
   if (!message) return res.status(400).json({ error: 'Missing body field: message' });
 
   try {
+    // Log session immediately (even if OpenAI fails). MVP: each request counts as a session.
+    createUsageEvent({
+      userId: pro.user.id,
+      kind: 'ai_chat_session',
+      meta: { mode: body.mode || null },
+    }).catch(() => null);
+
     const result = await careerChat({
       message,
       profile: body.profile || {},
@@ -560,6 +569,27 @@ app.post('/api/ai/chat', async (req, res) => {
       preferredLanguage: body.preferredLanguage || null,
     });
     res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: String(err && err.message ? err.message : err) });
+  }
+});
+
+app.get('/api/admin/metrics/ai-chat', async (req, res) => {
+  const payload = requireAuth(req, res);
+  if (!payload) return;
+  if (!isAdminEmail(payload.email)) return res.status(403).json({ error: 'Forbidden' });
+
+  try {
+    const weeks = Number(req.query.weeks || 16);
+    const rows = await listUsageWeeklyCounts({ kind: 'ai_chat_session', weeks });
+    res.json({
+      kind: 'ai_chat_session',
+      weeks: Math.max(1, Math.min(104, Number(weeks) || 16)),
+      rows: rows.map((r) => ({
+        weekStart: r.week_start,
+        count: r.count,
+      })),
+    });
   } catch (err) {
     res.status(500).json({ error: String(err && err.message ? err.message : err) });
   }

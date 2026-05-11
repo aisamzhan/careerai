@@ -47,10 +47,13 @@ function AdminPage() {
   const [requestsMsg, setRequestsMsg] = useState('');
   const [audit, setAudit] = useState([]);
   const [auditLoading, setAuditLoading] = useState(false);
+  const [aiChatMetrics, setAiChatMetrics] = useState([]);
+  const [aiChatLoading, setAiChatLoading] = useState(false);
 
   const [showUsers, setShowUsers] = useState(false);
   const [showRequests, setShowRequests] = useState(false);
   const [showAudit, setShowAudit] = useState(false);
+  const [showAiChat, setShowAiChat] = useState(false);
 
   const token = useMemo(() => localStorage.getItem('authToken'), []);
 
@@ -109,6 +112,32 @@ function AdminPage() {
       mounted = false;
     };
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    if (!showAiChat) return;
+    let mounted = true;
+    (async () => {
+      try {
+        setAiChatLoading(true);
+        const t = localStorage.getItem('authToken');
+        if (!t) return;
+        const data = await fetchJson(`${API_BASE}/api/admin/metrics/ai-chat?weeks=24`, {
+          headers: { Authorization: `Bearer ${t}` },
+        });
+        if (!mounted) return;
+        setAiChatMetrics(Array.isArray(data.rows) ? data.rows : []);
+      } catch {
+        if (!mounted) return;
+        setAiChatMetrics([]);
+      } finally {
+        if (mounted) setAiChatLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [isAdmin, showAiChat]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -364,6 +393,45 @@ function AdminPage() {
                         <div className="notice__small">
                           {a.entity_type}: {a.entity_id}
                         </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="qa">
+                <div className="qa__title">AI chat sessions</div>
+                <div className="muted muted--small">
+                  {aiChatLoading ? 'Loading...' : `Weekly counts: ${aiChatMetrics.length}`}
+                </div>
+                <div style={{ marginTop: 10 }}>
+                  <button
+                    className="button button--sm button--ghost"
+                    type="button"
+                    onClick={() => setShowAiChat((v) => !v)}
+                  >
+                    {showAiChat ? 'Collapse' : 'Expand'}
+                  </button>
+                </div>
+
+                {showAiChat && !aiChatLoading && aiChatMetrics.length === 0 && (
+                  <div className="empty" style={{ marginTop: '10px' }}>
+                    <div className="empty__title">No data yet</div>
+                    <p className="empty__text">Once users use the AI chat, weekly counts will appear here.</p>
+                  </div>
+                )}
+
+                {showAiChat && !aiChatLoading && aiChatMetrics.length > 0 && (
+                  <div className="stack" style={{ marginTop: '10px' }}>
+                    {aiChatMetrics.map((r) => (
+                      <div className="notice" key={String(r.weekStart)}>
+                        <div className="notice__row">
+                          <span className="notice__label">
+                            {r.weekStart ? new Date(r.weekStart).toLocaleDateString() : 'Week'}
+                          </span>
+                          <span className="notice__value">{r.count}</span>
+                        </div>
+                        <div className="notice__small">Sessions (requests) during that week</div>
                       </div>
                     ))}
                   </div>

@@ -84,6 +84,19 @@ async function initAuthDb() {
     );
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS admin_audit_log_created_at_idx ON admin_audit_log(created_at);`);
+
+  // Usage events (for simple product metrics: AI chat sessions, resume imports, etc.)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS usage_events (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      kind TEXT NOT NULL,
+      meta_json TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS usage_events_user_id_idx ON usage_events(user_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS usage_events_kind_created_at_idx ON usage_events(kind, created_at);`);
 }
 
 async function findUserByEmail(email) {
@@ -248,6 +261,39 @@ async function listAdminAudit({ limit = 200 } = {}) {
   return res.rows || [];
 }
 
+async function createUsageEvent({ userId, kind, meta } = {}) {
+  const pool = getPool();
+  const k = String(kind || '').trim().slice(0, 80);
+  if (!userId || !k) return null;
+  const res = await pool.query(
+    `INSERT INTO usage_events (user_id, kind, meta_json)
+     VALUES ($1, $2, $3)
+     RETURNING id, user_id, kind, created_at`,
+    [userId, k, meta ? JSON.stringify(meta).slice(0, 8000) : ''],
+  );
+  return res.rows[0] || null;
+}
+
+async function listUsageWeeklyCounts({ kind, weeks = 16 } = {}) {
+  const pool = getPool();
+  const k = String(kind || '').trim();
+  const w = Math.max(1, Math.min(104, Number(weeks) || 16));
+  if (!k) return [];
+
+  // Count per UTC week start.
+  const res = await pool.query(
+    `SELECT date_trunc('week', created_at) AS week_start, COUNT(*)::int AS count
+     FROM usage_events
+     WHERE kind = $1
+       AND created_at >= (now() - ($2::int * interval '7 days'))
+     GROUP BY 1
+     ORDER BY 1 DESC`,
+    [k, w],
+  );
+
+  return res.rows || [];
+}
+
 module.exports = {
   getPool,
   initAuthDb,
@@ -262,4 +308,6 @@ module.exports = {
   getPaymentReceiptById,
   appendAdminAudit,
   listAdminAudit,
+  createUsageEvent,
+  listUsageWeeklyCounts,
 };
