@@ -48,8 +48,8 @@ function AdminPage() {
   const [audit, setAudit] = useState([]);
   const [auditLoading, setAuditLoading] = useState(false);
 
-  const [showUsers, setShowUsers] = useState(true);
-  const [showRequests, setShowRequests] = useState(true);
+  const [showUsers, setShowUsers] = useState(false);
+  const [showRequests, setShowRequests] = useState(false);
   const [showAudit, setShowAudit] = useState(false);
 
   const token = useMemo(() => localStorage.getItem('authToken'), []);
