@@ -1,5 +1,28 @@
 import { Link } from 'react-router-dom';
 
+function IconInfo(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" {...props}>
+      <path
+        d="M12 2a10 10 0 1010 10A10.01 10.01 0 0012 2zm0 18a8 8 0 118-8 8.01 8.01 0 01-8 8z"
+        fill="currentColor"
+      />
+      <path d="M11 10h2v7h-2v-7zm0-3h2v2h-2V7z" fill="currentColor" opacity="0.85" />
+    </svg>
+  );
+}
+
+function IconGlobe(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" {...props}>
+      <path
+        d="M12 2a10 10 0 1010 10A10.01 10.01 0 0012 2zm7.8 9h-3.2a15.6 15.6 0 00-1.3-6A8.03 8.03 0 0119.8 11zM12 4c.9 1.2 1.7 3.4 2.1 7H9.9C10.3 7.4 11.1 5.2 12 4zM4.2 13h3.2a15.6 15.6 0 001.3 6A8.03 8.03 0 014.2 13zM4.2 11A8.03 8.03 0 018.7 5a15.6 15.6 0 00-1.3 6H4.2zm7.8 9c-.9-1.2-1.7-3.4-2.1-7h4.2c-.4 3.6-1.2 5.8-2.1 7zm3.3-1a15.6 15.6 0 001.3-6h3.2a8.03 8.03 0 01-4.5 6z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
 function FaqPage() {
   return (
     <div className="app-page app-page--with-navbar">
@@ -12,43 +35,72 @@ function FaqPage() {
         </header>
 
         <section className="staticPage__section">
-          <h2 className="staticPage__h2">Is CareerAI only for Kazakhstan?</h2>
-          <p className="staticPage__p">
-            The knowledge base is designed for Kazakhstan labour market context, so advice is bounded
-            to that region.
-          </p>
-        </section>
+          <div className="faqGrid">
+            <div className="glassCard">
+              <div className="glassCard__top">
+                <div className="glassCard__title">Is CareerAI only for Kazakhstan?</div>
+                <span className="glassCard__icon glassCard__icon--teal">
+                  <IconGlobe />
+                </span>
+              </div>
+              <div className="glassCard__text">
+                The knowledge base is designed for Kazakhstan labour market context, so advice is bounded
+                to that region.
+              </div>
+            </div>
 
-        <section className="staticPage__section">
-          <h2 className="staticPage__h2">Can I use Russian?</h2>
-          <p className="staticPage__p">
-            Yes. The UI is in English, but if you write in Russian in the chat, the AI should answer
-            in Russian.
-          </p>
-        </section>
+            <div className="glassCard">
+              <div className="glassCard__top">
+                <div className="glassCard__title">Can I use Russian?</div>
+                <span className="glassCard__icon glassCard__icon--blue">
+                  <IconInfo />
+                </span>
+              </div>
+              <div className="glassCard__text">
+                Yes. The UI is in English, but if you write in Russian in the chat, the AI should answer
+                in Russian.
+              </div>
+            </div>
 
-        <section className="staticPage__section">
-          <h2 className="staticPage__h2">Do I need to fill all profile fields?</h2>
-          <p className="staticPage__p">
-            No. Missing fields stay blank and the system still works. More data usually improves
-            accuracy.
-          </p>
-        </section>
+            <div className="glassCard">
+              <div className="glassCard__top">
+                <div className="glassCard__title">Do I need to fill all profile fields?</div>
+                <span className="glassCard__icon glassCard__icon--amber">
+                  <IconInfo />
+                </span>
+              </div>
+              <div className="glassCard__text">
+                No. Missing fields stay blank and the system still works. More data usually improves
+                accuracy.
+              </div>
+            </div>
 
-        <section className="staticPage__section">
-          <h2 className="staticPage__h2">Why is payment manual?</h2>
-          <p className="staticPage__p">
-            This is an MVP. Manual Kaspi verification makes it possible to ship faster while keeping
-            the product usable.
-          </p>
-        </section>
+            <div className="glassCard">
+              <div className="glassCard__top">
+                <div className="glassCard__title">Why is payment manual?</div>
+                <span className="glassCard__icon glassCard__icon--amber">
+                  <IconInfo />
+                </span>
+              </div>
+              <div className="glassCard__text">
+                This is an MVP. Manual Kaspi verification makes it possible to ship faster while keeping
+                the product usable.
+              </div>
+            </div>
 
-        <section className="staticPage__section">
-          <h2 className="staticPage__h2">What is unlocked with Pro?</h2>
-          <p className="staticPage__p">
-            Resume import (.docx) and AI Chat. The basic CareerAI analysis is available after sign
-            in.
-          </p>
+            <div className="glassCard">
+              <div className="glassCard__top">
+                <div className="glassCard__title">What is unlocked with Pro?</div>
+                <span className="glassCard__icon glassCard__icon--teal">
+                  <IconInfo />
+                </span>
+              </div>
+              <div className="glassCard__text">
+                Resume import (.docx) and AI Chat. The basic CareerAI analysis is available after sign
+                in.
+              </div>
+            </div>
+          </div>
         </section>
 
         <section className="staticPage__section staticPage__section--cta">
@@ -75,4 +127,3 @@ function FaqPage() {
 }
 
 export default FaqPage;
-
