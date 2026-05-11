@@ -453,6 +453,10 @@ app.get('/api/admin/payment-requests/:id/receipt', async (req, res) => {
   try {
     const r = await getPaymentReceiptById(id);
     if (!r) return res.status(404).json({ error: 'Not found' });
+    // Privacy: allow receipt view only while request is pending.
+    if (String(r.status || '').toLowerCase() !== 'pending') {
+      return res.status(404).json({ error: 'Not found' });
+    }
     if (!r.receipt_base64) return res.status(404).json({ error: 'No receipt' });
     const mime = String(r.receipt_mime || 'image/png');
     const buf = Buffer.from(String(r.receipt_base64), 'base64');

@@ -48,6 +48,10 @@ function AdminPage() {
   const [audit, setAudit] = useState([]);
   const [auditLoading, setAuditLoading] = useState(false);
 
+  const [showUsers, setShowUsers] = useState(true);
+  const [showRequests, setShowRequests] = useState(true);
+  const [showAudit, setShowAudit] = useState(false);
+
   const token = useMemo(() => localStorage.getItem('authToken'), []);
 
   useEffect(() => {
@@ -238,6 +242,15 @@ function AdminPage() {
                 <div className="notice__small">
                   Sorted by newest first. Passwords are not stored in plain text.
                 </div>
+                <div style={{ marginTop: 10 }}>
+                  <button
+                    className="button button--sm button--ghost"
+                    type="button"
+                    onClick={() => setShowUsers((v) => !v)}
+                  >
+                    {showUsers ? 'Collapse' : 'Expand'}
+                  </button>
+                </div>
               </div>
 
               {!loadingUsers && users.length === 0 && (
@@ -247,7 +260,7 @@ function AdminPage() {
                 </div>
               )}
 
-              {!loadingUsers && users.length > 0 && (
+              {!loadingUsers && showUsers && users.length > 0 && (
                 <div className="stack">
                   {users.map((u) => (
                     <div className="notice" key={u.id}>
@@ -270,13 +283,22 @@ function AdminPage() {
                   {requestsLoading ? 'Loading...' : `Pending/approved list: ${requests.length}`}
                 </div>
                 {requestsMsg && <div className="muted muted--small">{requestsMsg}</div>}
+                <div style={{ marginTop: 10 }}>
+                  <button
+                    className="button button--sm button--ghost"
+                    type="button"
+                    onClick={() => setShowRequests((v) => !v)}
+                  >
+                    {showRequests ? 'Collapse' : 'Expand'}
+                  </button>
+                </div>
                 {!requestsLoading && requests.length === 0 && (
                   <div className="empty" style={{ marginTop: '10px' }}>
                     <div className="empty__title">No payment requests</div>
                     <p className="empty__text">Users will submit transaction IDs from the Home page.</p>
                   </div>
                 )}
-                {!requestsLoading && requests.length > 0 && (
+                {!requestsLoading && showRequests && requests.length > 0 && (
                   <div className="stack" style={{ marginTop: '10px' }}>
                     {requests.map((r) => (
                       <div className="notice" key={r.id}>
@@ -288,7 +310,7 @@ function AdminPage() {
                         <div className="notice__small">Sender: {r.payer_account || '—'}</div>
                         <div className="notice__small">Transaction ID: {r.transaction_id}</div>
                         {!!r.notes && <div className="notice__small">Notes: {r.notes}</div>}
-                        {r.has_receipt && (
+                        {r.status === 'pending' && r.has_receipt && (
                           <div style={{ marginTop: '10px' }}>
                             <button className="button button--sm button--ghost" type="button" onClick={() => openReceipt(r.id)}>
                               Open receipt screenshot
@@ -313,13 +335,22 @@ function AdminPage() {
                 <div className="muted muted--small">
                   {auditLoading ? 'Loading...' : `Latest actions: ${audit.length}`}
                 </div>
+                <div style={{ marginTop: 10 }}>
+                  <button
+                    className="button button--sm button--ghost"
+                    type="button"
+                    onClick={() => setShowAudit((v) => !v)}
+                  >
+                    {showAudit ? 'Collapse' : 'Expand'}
+                  </button>
+                </div>
                 {!auditLoading && audit.length === 0 && (
                   <div className="empty" style={{ marginTop: '10px' }}>
                     <div className="empty__title">No actions yet</div>
                     <p className="empty__text">Approvals will appear here.</p>
                   </div>
                 )}
-                {!auditLoading && audit.length > 0 && (
+                {!auditLoading && showAudit && audit.length > 0 && (
                   <div className="stack" style={{ marginTop: '10px' }}>
                     {audit.map((a) => (
                       <div className="notice" key={a.id}>

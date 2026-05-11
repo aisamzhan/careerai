@@ -197,7 +197,7 @@ async function listPaymentRequests({ limit = 200, status = null } = {}) {
 async function getPaymentReceiptById(id) {
   const pool = getPool();
   const res = await pool.query(
-    `SELECT id, user_id, receipt_mime, receipt_base64
+    `SELECT id, user_id, status, receipt_mime, receipt_base64
      FROM payment_requests
      WHERE id = $1
      LIMIT 1`,
