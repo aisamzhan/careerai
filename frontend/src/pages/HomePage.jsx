@@ -33,6 +33,13 @@ function toIntOrEmpty(value) {
   return Number.isFinite(n) ? n : '';
 }
 
+function splitCsv(value) {
+  return String(value || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 const HomePage = () => {
   const navigate = useNavigate();
 
@@ -108,6 +115,21 @@ const HomePage = () => {
       return null;
     }
   })();
+
+  const selectedProfession = professions.find((p) => p.id === form.targetProfessionId) || null;
+  const skillCount =
+    splitCsv(form.technicalSkills).length +
+    splitCsv(form.toolsSkills).length +
+    splitCsv(form.softSkills).length;
+  const readinessItems = [
+    { label: 'Location', done: Boolean(form.city) },
+    { label: 'Languages', done: Boolean(form.englishLevel || form.kazakhLevel || form.russianLevel) },
+    { label: 'Skills', done: skillCount > 0 },
+    { label: 'Experience', done: Boolean(form.experienceMonths || form.projectCount || form.experienceText) },
+    { label: 'Goal', done: Boolean(form.targetProfessionId) },
+  ];
+  const readinessDone = readinessItems.filter((i) => i.done).length;
+  const readinessPercent = Math.round((readinessDone / readinessItems.length) * 100);
 
   const openPaywall = async (kind) => {
     setPaywallFor(kind || '');
@@ -511,12 +533,84 @@ const HomePage = () => {
   return (
     <div className="app-page app-page--with-navbar">
       <div className="dashboard">
-        <div className="card dashboard__panel">
+        <div className="card dashboard__panel" id="profile-form">
           <h2 className="panel-title">Profile and Resume</h2>
           <p className="muted">
             Fill in your profile and goals. CareerAI compares your skills and experience with role requirements in
             Kazakhstan and gives a fit estimate plus next steps.
           </p>
+
+          <div className="cockpit">
+            <div className="cockpit__top">
+              <div>
+                <div className="cockpit__eyebrow">Career cockpit</div>
+                <div className="cockpit__title">
+                  {selectedProfession ? selectedProfession.name : 'Choose a target role'}
+                </div>
+                <div className="cockpit__text">
+                  {selectedProfession
+                    ? `${selectedProfession.demandLevel} demand in the Kazakhstan market`
+                    : 'CareerAI can still suggest top matches, but focused goals improve advice.'}
+                </div>
+              </div>
+              <div className="cockpit__score">
+                <span>{readinessPercent}</span>
+                <small>% ready</small>
+              </div>
+            </div>
+
+            <div className="cockpit__meter" aria-label={`Profile readiness ${readinessPercent}%`}>
+              <span style={{ width: `${readinessPercent}%` }} />
+            </div>
+
+            <div className="cockpit__grid">
+              <div className="cockpit__metric">
+                <span className="cockpit__metricLabel">Skills</span>
+                <strong>{skillCount}</strong>
+              </div>
+              <div className="cockpit__metric">
+                <span className="cockpit__metricLabel">Experience</span>
+                <strong>{Number(form.experienceMonths || 0) || 0} mo</strong>
+              </div>
+              <div className="cockpit__metric">
+                <span className="cockpit__metricLabel">Pro</span>
+                <strong>{hasPro ? 'Active' : 'Locked'}</strong>
+              </div>
+            </div>
+
+            <div className="readiness">
+              {readinessItems.map((item) => (
+                <span key={item.label} className={`readiness__item ${item.done ? 'is-done' : ''}`}>
+                  {item.done ? 'OK' : '--'} {item.label}
+                </span>
+              ))}
+            </div>
+
+            <div className="quickActions">
+              <button
+                className="button button--sm"
+                type="button"
+                onClick={() => document.getElementById('profile-form')?.querySelector('form')?.requestSubmit()}
+                disabled={analyzing}
+              >
+                {analyzing ? 'Analyzing...' : 'Run analysis'}
+              </button>
+              <button
+                className="button button--sm button--ghost"
+                type="button"
+                onClick={() => resumeInputRef.current && resumeInputRef.current.click()}
+              >
+                Import resume
+              </button>
+              <button
+                className="button button--sm button--ghost"
+                type="button"
+                onClick={() => document.getElementById('analysis-panel')?.scrollIntoView({ behavior: 'smooth' })}
+              >
+                Open AI panel
+              </button>
+            </div>
+          </div>
 
           <form className="form" onSubmit={handleAnalyze}>
             <div className="qa">
@@ -851,17 +945,40 @@ const HomePage = () => {
           </form>
         </div>
 
-        <div className="card dashboard__panel">
+        <div className="card dashboard__panel" id="analysis-panel">
           <h2 className="panel-title">CareerAI Analysis</h2>
           <p className="muted">The fit estimate is based on matching your profile with Kazakhstan labor market data.</p>
 
           {!analysis && (
-            <div className="empty">
+            <div className="empty empty--guided">
               <p className="empty__title">Ready when you are</p>
               <p className="empty__text">
                 Fill in your profile and click Analyze. If you do not pick a target profession, CareerAI will show the
                 top matches.
               </p>
+              <div className="promptChips">
+                <button
+                  className="promptChip"
+                  type="button"
+                  onClick={() => setQuestion('What role fits my current skills best?')}
+                >
+                  Best role for me
+                </button>
+                <button
+                  className="promptChip"
+                  type="button"
+                  onClick={() => setQuestion('What should I improve first to get hired in Kazakhstan?')}
+                >
+                  First skill gap
+                </button>
+                <button
+                  className="promptChip"
+                  type="button"
+                  onClick={() => setQuestion('Give me a short 30-day plan.')}
+                >
+                  30-day plan
+                </button>
+              </div>
             </div>
           )}
 

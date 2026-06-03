@@ -30,6 +30,13 @@ function formatList(value) {
   return s;
 }
 
+function splitCsv(value) {
+  return String(value || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 function ProfilePage() {
   const navigate = useNavigate();
   const [user] = useState(() => safeJsonParse(localStorage.getItem('currentUser')));
@@ -40,6 +47,7 @@ function ProfilePage() {
   const [adminUsers, setAdminUsers] = useState([]);
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminError, setAdminError] = useState('');
+  const [copyMsg, setCopyMsg] = useState('');
 
   useEffect(() => {
     if (!user) navigate('/login');
@@ -58,7 +66,7 @@ function ProfilePage() {
         });
         if (!mounted) return;
         setAdmin(Boolean(data && data.isAdmin));
-      } catch (e) {
+      } catch {
         if (!mounted) return;
         // Ignore for non-auth sessions; show only if needed.
       }
@@ -150,6 +158,37 @@ function ProfilePage() {
     );
   }
 
+  const topResult = assessment?.top || (Array.isArray(assessment?.results) ? assessment.results[0] : null);
+  const profilePercent = assessment?.profileCoverage?.percent ?? 0;
+  const missingCount = assessment?.profileCoverage?.missingKeys?.length || 0;
+  const skillCount =
+    splitCsv(savedProfile.technicalSkills).length +
+    splitCsv(savedProfile.toolsSkills).length +
+    splitCsv(savedProfile.softSkills).length;
+  const summaryText = [
+    `Name: ${user.name || 'Student'}`,
+    `University: ${user.university || 'Not set'}`,
+    `City: ${savedProfile.city || 'Not set'}`,
+    `Languages: English ${savedProfile.englishLevel || 'N/A'}, Kazakh ${savedProfile.kazakhLevel || 'N/A'}, Russian ${savedProfile.russianLevel || 'N/A'}`,
+    `Experience: ${savedProfile.experienceMonths || 0} months, ${savedProfile.projectCount || 0} projects`,
+    `Technical skills: ${formatList(savedProfile.technicalSkills)}`,
+    `Tools: ${formatList(savedProfile.toolsSkills)}`,
+    `Soft skills: ${formatList(savedProfile.softSkills)}`,
+    `Goal: ${savedGoals.targetProfessionId || 'Not set'} in ${savedGoals.targetCity || 'Not set'}`,
+    topResult ? `Current top fit: ${topResult.professionName} (${topResult.fitScore}%)` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const copySummary = async () => {
+    try {
+      await navigator.clipboard.writeText(summaryText);
+      setCopyMsg('Summary copied.');
+    } catch {
+      setCopyMsg('Copy failed. You can select the snapshot manually.');
+    }
+  };
+
   return (
     <div className="app-page app-page--with-navbar">
       <div className="dashboard">
@@ -160,32 +199,57 @@ function ProfilePage() {
           </p>
 
           <div className="stack">
-            <div className="notice">
-              <div className="notice__row">
-                <span className="notice__label">Identity</span>
-                <span className="notice__value">{user.name || 'Student'}</span>
+            <div className="profileHero">
+              <div>
+                <div className="profileHero__eyebrow">Career profile</div>
+                <div className="profileHero__name">{user.name || 'Student'}</div>
+                <div className="profileHero__meta">{user.university || 'University not set'} | {user.email}</div>
               </div>
-              <div className="notice__small">Email: {user.email}</div>
-              <div className="notice__small">University: {user.university || 'Not set'}</div>
-            </div>
-
-            <div className="notice">
-              <div className="notice__row">
-                <span className="notice__label">Profile completeness</span>
-                <span className="notice__value">
-                  {loading ? 'Calculating...' : assessment?.profileCoverage?.percent != null ? `${assessment.profileCoverage.percent}%` : 'Not available'}
-                </span>
+              <div className="profileHero__fit">
+                <strong>{loading ? '...' : `${profilePercent}%`}</strong>
+                <span>complete</span>
               </div>
-              {!!assessment?.profileCoverage?.missingKeys?.length && (
-                <div className="notice__small">Missing: {assessment.profileCoverage.missingKeys.join(', ')}</div>
-              )}
             </div>
 
             {error && <div className="error error--left">{error}</div>}
 
+            <div className="profileStats">
+              <div className="profileStat">
+                <span>Skills</span>
+                <strong>{skillCount}</strong>
+              </div>
+              <div className="profileStat">
+                <span>Experience</span>
+                <strong>{savedProfile.experienceMonths || 0} mo</strong>
+              </div>
+              <div className="profileStat">
+                <span>Missing fields</span>
+                <strong>{loading ? '...' : missingCount}</strong>
+              </div>
+            </div>
+
+            {!!topResult && (
+              <div className="notice">
+                <div className="notice__row">
+                  <span className="notice__label">Top fit estimate</span>
+                  <span className="notice__value">
+                    {topResult.professionName} ({topResult.fitScore}%)
+                  </span>
+                </div>
+                {!!topResult.confidenceReason && (
+                  <div className="notice__small">
+                    Confidence: {topResult.confidence} ({topResult.confidenceReason})
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="field-actions">
               <button className="button" type="button" onClick={() => navigate('/home')}>
                 Go to Home (edit profile)
+              </button>
+              <button className="button button--ghost" type="button" onClick={copySummary}>
+                Copy profile summary
               </button>
               <button
                 className="button button--ghost"
@@ -198,6 +262,7 @@ function ProfilePage() {
               >
                 Clear saved Profile/Goals
               </button>
+              {copyMsg && <div className="notice__small">{copyMsg}</div>}
             </div>
           </div>
         </div>
@@ -236,22 +301,6 @@ function ProfilePage() {
               <div className="role-result__hint">Target city: {savedGoals.targetCity || 'Not set'}</div>
               <div className="role-result__hint">Timeline (months): {savedGoals.timelineMonths || 'Not set'}</div>
             </div>
-
-            {!!assessment?.top && (
-              <div className="notice">
-                <div className="notice__row">
-                  <span className="notice__label">Top fit (estimate)</span>
-                  <span className="notice__value">
-                    {assessment.top.professionName} ({assessment.top.fitScore}%)
-                  </span>
-                </div>
-                {!!assessment.top.confidenceReason && (
-                  <div className="notice__small">
-                    Confidence: {assessment.top.confidence} ({assessment.top.confidenceReason})
-                  </div>
-                )}
-              </div>
-            )}
 
             {admin && (
               <div className="qa">
